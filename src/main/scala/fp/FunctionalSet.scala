@@ -20,13 +20,19 @@ trait MySet[A] extends (A => Boolean) {
   def flatMap[B](f: A => MySet[B]): MySet[B]
   def filter(predicate: A => Boolean): MySet[A]
   def foreach(f: A => Unit): Unit
+
+  def -(elem: A): MySet[A]
+  def --(anotherSet: MySet[A]): MySet[A]
+  def &(anotherSet:MySet[A]): MySet[A]
+
+  def unary_! : MySet[A]
 }
 
 
 /*
 EmptySet is a representation of the MySet trait but without any elements, it implements the methods taking into account that MySet will initially have no elements
 */
-class EmptySet[A] extends MySet[A] {
+class EmptySet[A] extends MySet[A]:
 
   /*
   the contains method always returns false because an EmptySet is a representation of MySet but without elements
@@ -53,7 +59,39 @@ class EmptySet[A] extends MySet[A] {
   def flatMap[B](f: A => MySet[B]): MySet[B] = new EmptySet[B]
   def filter(predicate: A => Boolean): MySet[A] = new EmptySet[A]
   def foreach(f: A => Unit): Unit = ()
-}
+
+  def -(elem: A): MySet[A] = new EmptySet[A]
+
+  def --(anotherSet: MySet[A]): MySet[A] = new EmptySet[A]
+
+  def &(anotherSet: MySet[A]): MySet[A] = new EmptySet[A]
+
+  def unary_! : MySet[A] = new PropertyBasedSet[A](_ => true)
+
+
+
+
+class PropertyBasedSet[A](property: A => Boolean) extends MySet[A]:
+  def contains(elem: A): Boolean = property(elem)
+  def +(elem: A): MySet[A] =
+    new PropertyBasedSet[A](x => property(x) || x == elem)
+  def ++(anotherSet: MySet[A]): MySet[A] =
+    new PropertyBasedSet[A](x => property(x) || x == anotherSet(x))
+
+  def map[B](f: A => B): MySet[B] = politelyFail
+
+  def flatMap[B](f: A => MySet[B]): MySet[B] = politelyFail
+  def foreach(f: A => Unit): Unit = politelyFail
+  def filter(predicate: A => Boolean): MySet[A] = new PropertyBasedSet[A](x => property(x) && predicate(x))
+
+
+  def -(elem: A): MySet[A] = filter(x => x != elem)
+  def --(anotherSet: MySet[A]): MySet[A] = filter(!anotherSet)
+  def &(anotherSet: MySet[A]): MySet[A] = filter(anotherSet)
+
+  def unary_! : MySet[A] = new PropertyBasedSet[A](x => !property(x))
+
+  def politelyFail = throw new IllegalArgumentException("Really deep rabbit hole!")
 
 
 /*
@@ -131,6 +169,19 @@ class NonEmptySet[A](head:A, tail:MySet[A]) extends MySet[A] {
     f(head)
     tail foreach f
   }
+
+  def -(elem: A): MySet[A] =
+    if (head == elem) tail
+    else tail - elem + head
+
+  def --(anotherSet: MySet[A]): MySet[A] = filter(!anotherSet)
+
+  def &(anotherSet: MySet[A]): MySet[A] =
+    filter(anotherSet) /*intersection = filtering*/
+
+
+  def unary_! : MySet[A] = new PropertyBasedSet[A](x => !this.contains(x))
+
 }
 
 object MySet {
